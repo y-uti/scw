@@ -1,12 +1,14 @@
 <?php
 
+require_once 'Math/Matrix.php';
+
 /*
  * $n 行 $m 列の零行列を作成する
  * 戻り値は二次元配列で $array[$i][$j] が $i 行 $j 列要素
  */
 function zeros($n, $m)
 {
-    return array_fill(0, $n, array_fill(0, $m, 0.0));
+    return Math_Matrix::makeZero($n, $m);
 }
 
 /*
@@ -15,23 +17,30 @@ function zeros($n, $m)
  */
 function eye($n, $m)
 {
-    $ret = zeros($n, $m);
-    for ($i = 0; $i < min($n, $m); ++$i) {
-        $ret[$i][$i] = 1.0;
+    if ($n == $m) {
+        return Math_Matrix::makeUnit($n);
+    } else {
+        $ret = Math_Matrix::makeZero($n, $m);
+        $ret->add(Math_Matrix::makeUnit(min($n, $m)));
+        return $ret;
     }
-    return $ret;
 }
 
 function vector($values)
 {
-    return array_map(
-        function ($v) { return (double) $v; },
-        $values);
+    $nrow = count($values);
+    $ncol = 1;
+    $ret = Math_Matrix::makeZero($nrow, $ncol);
+    for ($i = 0; $i < $nrow; ++$i) {
+        $ret->setElement($i, 0, $values[$i]);
+    }
+    return $ret;
 }
 
 function vector_size($v)
 {
-    return count($v);
+    $size = $v->getSize();
+    return $size[0];
 }
 
 /*
@@ -41,17 +50,9 @@ function vector_size($v)
  */
 function matrix_sub($a, $b)
 {
-    $n = count($a);
-    $m = count($a[0]);
-
-    $result = array_fill(0, $n, array_fill(0, $m, 0));
-    for ($i = 0; $i < $n; ++$i) {
-        for ($j = 0; $j < $m; ++$j) {
-            $result[$i][$j] = $a[$i][$j] - $b[$i][$j];
-        }
-    }
-
-    return $result;
+    $ret = $a->cloneMatrix();
+    $ret->sub($b);
+    return $ret;
 }
 
 /*
@@ -63,20 +64,9 @@ function matrix_sub($a, $b)
  */
 function matrix_mul($a, $b)
 {
-    $n = count($a);
-    $p = count($a[0]); // == count($b);
-    $m = count($b[0]);
-
-    $result = array_fill(0, $n, array_fill(0, $m, 0));
-    for ($i = 0; $i < $n; ++$i) {
-        for ($j = 0; $j < $m; ++$j) {
-            for ($k = 0; $k < $p; ++$k) {
-                $result[$i][$j] += $a[$i][$k] * $b[$k][$j];
-            }
-        }
-    }
-
-    return $result;
+    $ret = $a->cloneMatrix();
+    $ret->multiply($b);
+    return $ret;
 }
 
 /*
@@ -85,8 +75,10 @@ function matrix_mul($a, $b)
  */
 function vector_scalar_add($v, $n)
 {
-    return array_map(
-        function ($vi) use ($n) { return $vi + $n; }, $v);
+    $size = $v->size();
+    $ret = $v->cloneMatrix();
+    $ret->add(Math_Matrix::makeOne($size[0], $size[1])->scale($n));
+    return $ret;
 }
 
 /*
@@ -95,8 +87,9 @@ function vector_scalar_add($v, $n)
  */
 function vector_scalar_mul($v, $n)
 {
-    return array_map(
-        function ($vi) use ($n) { return $vi * $n; }, $v);
+    $ret = $v->cloneMatrix();
+    $ret->scale($n);
+    return $ret;
 }
 
 /*
@@ -105,8 +98,9 @@ function vector_scalar_mul($v, $n)
  */
 function vector_add($a, $b)
 {
-    return array_map(
-        function ($ai, $bi) { return (double)$ai + (double)$bi; }, $a, $b);
+    $ret = $a->cloneMatrix();
+    $ret->add($b);
+    return $ret;
 }
 
 /*
@@ -117,17 +111,11 @@ function vector_add($a, $b)
  */
 function vector_mul($a, $b)
 {
-    $n = count($a);
-    $m = count($b);
-
-    $result = array_fill(0, $n, array_fill(0, $m, 0));
-    for ($i = 0; $i < $n; ++$i) {
-        for ($j = 0; $j < $m; ++$j) {
-            $result[$i][$j] = $a[$i] * $b[$j];
-        }
-    }
-
-    return $result;
+    $ret = $a->cloneMatrix();
+    $bt = $b->cloneMatrix();
+    $bt->transpose();
+    $ret->multiply($bt);
+    return $ret;
 }
 
 /*
@@ -136,11 +124,13 @@ function vector_mul($a, $b)
  */
 function inner_product($va, $vb)
 {
-    return array_sum(
-        array_map(
-            function ($a, $b) { return (double)$a * (double)$b; },
-            $va,
-            $vb));
+    $ret = $va->cloneMatrix();
+    $size = $ret->getSize();
+    if ($size[0] > 1) {
+        $ret->transpose();
+    }
+    $ret->multiply($vb);
+    return $ret->getElement(0, 0);
 }
 
 /*
@@ -151,17 +141,9 @@ function inner_product($va, $vb)
  */
 function matrix_vector_mul($m, $v)
 {
-    $n = count($m);
-    $p = count($m[0]); // == count($v)
-
-    $result = array_fill(0, $n, 0);
-    for ($i = 0; $i < $n; ++$i) {
-        for ($j = 0; $j < $p; ++$j) {
-            $result[$i] += $m[$i][$j] * $v[$j];
-        }
-    }
-
-    return $result;
+    $ret = $m->cloneMatrix();
+    $ret->multiply($v);
+    return $ret;
 }
 
 /*
@@ -172,20 +154,13 @@ function matrix_vector_mul($m, $v)
  */
 function tvector_matrix_mul($v, $m)
 {
-    $n = count($m[0]);
-    $p = count($m); // == count($v);
-
-    $result = array_fill(0, $n, 0);
-    for ($i = 0; $i < $n; ++$i) {
-        for ($j = 0; $j < $p; ++$j) {
-            $result[$i] += $v[$j] * $m[$j][$i];
-        }
-    }
-
-    return $result;
+    $ret = $v->cloneMatrix();
+    $ret->transpose();
+    $ret->multiply($m);
+    return $ret;
 }
 
 function vector_to_string($v)
 {
-    return implode(',', $v);
+    return implode(',', $v->getCol(0));
 }

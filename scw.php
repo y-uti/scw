@@ -1,6 +1,8 @@
 <?php
 
+// require 'math-matrix-wrapper.php';
 require 'matrix.php';
+
 require 'misc.php';
 
 class SCW {
@@ -17,10 +19,12 @@ class SCW {
 
     function train($xs, $ys)
     {
-        $dim = count($xs[0]);
+        $dim = vector_size($xs[0]);
 
         $this->initialize($dim);
-        foreach (zip($xs, $ys) as list($x, $y)) {
+        for ($i = 0; $i < count($xs); ++$i) {
+            $x = $xs[$i];
+            $y = $ys[$i];
             $this->step($x, $y);
         }
     }
@@ -29,7 +33,9 @@ class SCW {
     {
         $total = count($xs);
         $error = 0;
-        foreach (zip($xs, $ys) as list($x, $y)) {
+        for ($i = 0; $i < count($xs); ++$i) {
+            $x = $xs[$i];
+            $y = $ys[$i];
             if ($this->predict($x) != $y) {
                 ++$error;
             }
@@ -40,7 +46,7 @@ class SCW {
 
     function initialize($ndim)
     {
-        $this->mu = zeros($ndim, $ndim);
+        $this->mu = zeros($ndim, 1);
         $this->sigma = eye($ndim, $ndim);
     }
 
@@ -52,7 +58,7 @@ class SCW {
             $this->beta = $this->calc_beta($x, $y);
             $this->update_mu($x, $y);
             $this->update_sigma($x, $y);
-            print "mu = " . implode(',', $this->mu) . "\n";
+            print "mu = " . vector_to_string($this->mu) . "\n";
         }
     }
 
@@ -65,7 +71,6 @@ class SCW {
     {
         $this->xtsx = $this->calc_xt_sigma_x($x);
         $this->ymux = $this->calc_y_mu_x($x, $y);
-
         $loss = $this->phi * sqrt($this->xtsx) - $this->ymux;
         return max(0, $loss);
     }
@@ -193,9 +198,7 @@ function read_data($file)
 
     $x = array_map(
         function ($l) {
-            return array_map(
-                function ($v) { return (double) $v; },
-                explode(',', $l));
+            return vector(explode(',', $l));
         }, $data);
 
     return array($x, $y);
